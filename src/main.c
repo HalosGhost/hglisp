@@ -7,9 +7,8 @@
 signed
 main (void) {
 
-    for ( ; ; ) {
-        char * input = readline("> ");
-
+    char * input;
+    while ( (input = readline("> ")) ) {
         add_history(input);
 
         puts(input);
