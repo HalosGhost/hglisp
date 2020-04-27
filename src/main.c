@@ -36,8 +36,8 @@ main (void) {
         #define X(id, name, def) name ": " def ";\n"
         printf("%s\n",
             PARSERS
-        #undef X
         );
+        #undef X
         pcq_err_print(not_parsed);
         return EXIT_FAILURE;
     }
