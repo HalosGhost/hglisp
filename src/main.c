@@ -22,14 +22,25 @@ main (void) {
     PARSERS
     #undef X
 
-    pcqa_lang(PCQA_LANG_DEFAULT,
-    #define X(id, name, def) name " : " def " ; "
+    pcq_err_t * not_parsed = pcqa_lang(PCQA_LANG_DEFAULT,
+    #define X(id, name, def) name ": " def ";\n"
         PARSERS
     #undef X
     #define X(id, name, def) , id
-        PARSERS
+        PARSERS,
     #undef X
+        NULL
     );
+
+    if ( not_parsed ) {
+        #define X(id, name, def) name ": " def ";\n"
+        printf("%s\n",
+            PARSERS
+        #undef X
+        );
+        pcq_err_print(not_parsed);
+        return EXIT_FAILURE;
+    }
 
     char * input;
     pcq_result_t r;
