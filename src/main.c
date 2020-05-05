@@ -1,25 +1,4 @@
-#include <stdio.h>
-#include <stdlib.h>
-#include <pcq.h>
-
-#include <readline/readline.h>
-#include <readline/history.h>
-
-#define FOR_EACH_PARSER \
-    X(Num, "number", "/-?[0-9]+/") \
-    X(Oper, "operator", "'+' | '-' | '*' | '/'") \
-    X(Expr, "expression", "<number> | '(' <operator> <expression>+ ')'") \
-    X(Program, "program", "/^/ <operator> <expression>+ /$/")
-
-#define X(id, name, def) + 1
-static const int PARSER_COUNT = FOR_EACH_PARSER;
-#undef X
-
-long
-eval (pcq_ast_t *);
-
-long
-eval_op (long, char *, long);
+#include "main.h"
 
 signed
 main (void) {
@@ -55,7 +34,7 @@ main (void) {
         add_history(input);
 
         if ( pcq_parse("<stdin>", input, Program, &r) ) {
-            printf("%ld\n", eval(r.output));
+            println_value(eval(r.output));
             pcq_ast_delete(r.output);
         } else {
             pcq_err_print(r.error);
@@ -74,15 +53,37 @@ main (void) {
     return EXIT_SUCCESS;
 }
 
-long
+struct lvalue
 eval (pcq_ast_t * ast) {
 
     if ( strstr(ast->tag, "number") ) {
-        return strtol(ast->contents, NULL, 10);
+        if ( strstr(ast->tag, "integer") ) {
+            errno = 0;
+            long x = 0;
+            sscanf(ast->contents, "%ld", &x);
+            errsv = errno;
+
+            if ( errsv ) {
+                return LERROR(Invalid_Number);
+            }
+
+            return LINT(x);
+        } else if ( strstr(ast->tag, "float") ) {
+            errno = 0;
+            double x = 0;
+            sscanf(ast->contents, "%lf", &x);
+            errsv = errno;
+
+            if ( errsv ) {
+                return LERROR(Invalid_Number);
+            }
+
+            return LFLOAT(x);
+        }
     }
 
     char * op = ast->children[1]->contents;
-    long x = eval(ast->children[2]);
+    struct lvalue x = eval(ast->children[2]);
 
     for ( size_t i = 3; strstr(ast->children[i]->tag, "expr"); ++ i ) {
         x = eval_op(x, op, eval(ast->children[i]));
@@ -91,15 +92,59 @@ eval (pcq_ast_t * ast) {
     return x;
 }
 
-long
-eval_op (long x, char * op, long y) {
+struct lvalue
+eval_op (struct lvalue x, char * op, struct lvalue y) {
+
+    if ( x.type == Error ) { return x; }
+    if ( y.type == Error ) { return y; }
+
+    if ( x.type == Floating || y.type == Floating ) {
+        switch ( *op ) {
+            case '+': return LFLOAT((x.type == Floating ? x.floating : x.integer) + (y.type == Floating ? y.floating : y.integer));
+            case '-': return LFLOAT((x.type == Floating ? x.floating : x.integer) - (y.type == Floating ? y.floating : y.integer));
+            case '*': return LFLOAT((x.type == Floating ? x.floating : x.integer) * (y.type == Floating ? y.floating : y.integer));
+            case '%': return LERROR(Invalid_Operator);
+            case '/':
+                return !y.floating ? LERROR(Division_By_Zero)
+                                 : LFLOAT((x.type == Floating ? x.floating : x.integer) / (y.type == Floating ? y.floating : y.integer));
+            default:  return LERROR(Invalid_Operator);
+        }
+    }
 
     switch ( *op ) {
-        case '+': return x + y;
-        case '-': return x - y;
-        case '*': return x * y;
-        case '/': return x / y;
-        default:  return 0;
+        case '+': return LINT(x.integer + y.integer);
+        case '-': return LINT(x.integer - y.integer);
+        case '*': return LINT(x.integer * y.integer);
+        case '%': return LINT(x.integer % y.integer);
+        case '/':
+            return !y.integer ? LERROR(Division_By_Zero)
+                             : LINT(x.integer / y.integer);
+        default:  return LERROR(Invalid_Operator);
     }
+}
+
+void
+print_value (struct lvalue val) {
+
+    switch ( val.type ) {
+        case Integer:
+            printf("%ld", val.integer);
+            break;
+
+        case Floating:
+            printf("%g", val.floating);
+            break;
+
+        case Error:
+            printf("(E%d): %s", val.error, errors[val.error]);
+            break;
+    }
+}
+
+void
+println_value (struct lvalue val) {
+
+    print_value(val);
+    putchar('\n');
 }
 
