@@ -5,6 +5,7 @@ CFLAGS ?= -g -ggdb -O3 -fPIE -flto -fstack-protector-strong --param=ssp-buffer-s
 LDFLAGS ?= `pkg-config --libs-only-l readline pcq`
 VER = r`git rev-list --count HEAD`.`git rev-parse --short HEAD`
 FMFLAGS = -wp -then -wp -wp-rte
+SOURCES = $(wildcard src/*.c)
 
 ifneq ($(CC), tcc)
 CFLAGS += -pie -D_FORTIFY_SOURCE=2
@@ -16,5 +17,14 @@ CFLAGS += -Weverything -fsanitize-trap=undefined
 endif
 
 CFLAGS += -Wno-disabled-macro-expansion
+
+CONFIGURATION ?= debug
+ifneq ($(CONFIGURATION), release)
+BLDDIR ?= dist/debug
+CFLAGS += -g -ggdb -O0 -U_FORTIFY_SOURCE
+else
+BLDDIR ?= dist/release
+CFLAGS += -DNDEBUG -O3
+endif
 
 include mke/rules

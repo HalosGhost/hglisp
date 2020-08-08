@@ -12,9 +12,11 @@ main (void) {
         FOR_EACH_PARSER
     #undef X
     #define X(id, name, def) , id
-        FOR_EACH_PARSER,
+        FOR_EACH_PARSER
     #undef X
-        NULL
+    #ifndef NDEBUG
+        , NULL
+    #endif
     );
 
     if ( failed_to_parse ) {
